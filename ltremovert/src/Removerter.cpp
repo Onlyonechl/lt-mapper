@@ -1659,7 +1659,7 @@ void Removerter::run(void)
     loadKeyframes();
     precleaningKeyframes(2.5); // optional. remove points within near radius from the lidar 
  
-    makeGlobalMap();
+    makeGlobalMap();   //保存输出地图，两个session分别保存
 
     // # Step 1: HD noise removal 
     removeHighDynamicPoints();

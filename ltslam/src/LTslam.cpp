@@ -88,10 +88,10 @@ void LTslam::run( void )
     writeAllSessionsTrajectories(std::string("bfr_intersession_loops"));
 
     detectInterSessionSCloops(); // detectInterSessionRSloops was internally done while sc detection 
-    addSCloops();
+    addSCloops();                                                                                     //Scan Context 回环     
     optimizeMultisesseionGraph(true); // optimize the graph with existing edges + SC loop edges
 
-    bool toOpt = addRSloops(); // using the optimized estimates (rough alignment using SC)
+    bool toOpt = addRSloops(); // using the optimized estimates (rough alignment using SC)        //Radius Search 回环
     optimizeMultisesseionGraph(toOpt); // optimize the graph with existing edges + SC loop edges + RS loop edges
 
     writeAllSessionsTrajectories(std::string("aft_intersession_loops"));
@@ -160,12 +160,12 @@ void LTslam::optimizeMultisesseionGraph(bool _toOpt)
         return;
 
     isam->update(gtSAMgraph, initialEstimate);
+    isam->update();            //问题：这里为什么有多次update??
     isam->update();
     isam->update();
     isam->update();
     isam->update();
-    isam->update();
-    isamCurrentEstimate = isam->calculateEstimate(); // must be followed by update 
+    isamCurrentEstimate = isam->calculateEstimate(); // must be followed by update    
 
     gtSAMgraph.resize(0);
     initialEstimate.clear();
@@ -197,7 +197,7 @@ std::optional<gtsam::Pose3> LTslam::doICPVirtualRelative( // for SC loop
 
     int base_key = 0; // its okay. (using the origin for sc loops' co-base) 
     int historyKeyframeSearchNum = 25; // TODO move to yaml 
-
+    //在两个session中分别找到最近邻的关键帧，再用关键帧点云进行ICP配准
     source_sess.loopFindNearKeyframesLocalCoord(cureKeyframeCloud, loop_idx_source_session, 0);
     target_sess.loopFindNearKeyframesLocalCoord(targetKeyframeCloud, loop_idx_target_session, historyKeyframeSearchNum); 
     mtx.unlock(); // unlock after loopFindNearKeyframesWithRespectTo because many new in the loopFindNearKeyframesWithRespectTo
@@ -321,7 +321,7 @@ void LTslam::detectInterSessionSCloops() // using ScanContext
         int loop_idx_source_session = source_node_idx;
         int loop_idx_target_session = detectResult.first;
 
-        if(loop_idx_target_session == -1) { // TODO using NO_LOOP_FOUND rather using -1 
+        if(loop_idx_target_session == -1) { // TODO using NO_LOOP_FOUND rather using -1   //如果没有找到符合条件的候选回环
             RSLoopIdxPairs_.emplace_back(std::pair(-1, loop_idx_source_session)); // -1 will be later be found (nn pose). 
             continue;
         }
@@ -392,7 +392,7 @@ void LTslam::addSCloops()
         auto& _loop_idx_pair = sc_loop_idx_pairs_sampled.at(ith);
         int loop_idx_target_session = _loop_idx_pair.first;
         int loop_idx_source_session = _loop_idx_pair.second;
-
+        //先用近邻和距离筛选出候选的回环id，再用ICP进行配准
         auto relative_pose_optional = doICPVirtualRelative(target_sess, source_sess, loop_idx_target_session, loop_idx_source_session); 
 
         if(relative_pose_optional) {
@@ -479,7 +479,7 @@ void LTslam::findNearestRSLoopsTargetNodeIdx() // based-on information gain
         if(target_node_idxes_within_ball.empty())
             continue;
 
-        // selected a single one having maximum information gain  
+        // selected a single one having maximum information gain   //选择和当前节点之间信息增益最大的节点
         int selected_near_target_node_idx; 
         double max_information_gain {0.0};     
         for (int i=0; i<target_node_idxes_within_ball.size(); i++) 
@@ -511,7 +511,7 @@ bool LTslam::addRSloops()
         return false;
 
     // find nearest target node idx 
-    findNearestRSLoopsTargetNodeIdx();
+    findNearestRSLoopsTargetNodeIdx();  //根据Radius Search(KNN)找到信息增益最大的新节点
 
     // parse RS loop src idx
     int num_rsloops_all_found = int(RSLoopIdxPairs_.size());
